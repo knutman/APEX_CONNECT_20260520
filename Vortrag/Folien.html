@@ -325,10 +325,10 @@
   <section class="slide">
     <h2>Übersicht</h2>
     <ol class="agenda">
-      <li><strong>Wer wir sind &amp; der Datensatz</strong>
-          <span>Enignum AI &middot; mehr als 110.000 Ladesäulen von der BNetzA</span></li>
-      <li><strong>Datenmodell &amp; Loader</strong>
-          <span>SQL Domains, Annotations, Spatial, JSON, REST direkt im MERGE</span></li>
+      <li><strong>Wer oder was ist Enignum?</strong>
+          <span>Energy-Intelligence-Platform aus Hamburg</span></li>
+      <li><strong>Datensatz, Datenmodell &amp; Loader</strong>
+          <span>BNetzA-Ladesäulenregister (mehr als 110.000 Stationen) &middot; SQL Domains, Annotations, Spatial, JSON, REST direkt im MERGE</span></li>
       <li><strong>App Map Region — der klassische Weg</strong>
           <span>Live-Demo &middot; das Performance-Problem erlebbar machen</span></li>
       <li><strong>App Vector Tiles — die schnelle Variante</strong>
@@ -350,8 +350,8 @@
     <div class="grid-2" style="margin-top: 1em; align-items: center;">
       <div>
         <p>
-          Energie-Intelligence-Plattform — Earth Observation,
-          Generative AI und Sovereign Cloud für Energie-Souveränität.
+          Energy-Intelligence-Platform — Earth Observation,
+          Generative AI and Sovereign Cloud for Energy Sovereignty.
         </p>
 
         <ul class="big">
@@ -384,7 +384,7 @@
       </div>
       <div style="text-align: center;">
         <img src="assets/enignum-screenshot.png"
-             alt="Enignum-Plattform Screenshot"
+             alt="Enignum-Platform Screenshot"
              style="max-width: 100%; max-height: 65vh; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
       </div>
     </div>
@@ -402,7 +402,7 @@
       „Wer hat schon mal versucht, mehr als 110.000 Punkte<br>
       auf eine APEX-Map zu bekommen?"
     </div>
-    <p class="meta" style="margin-top: 2em;">— jeder, der eine Map-Region mal geöffnet hat</p>
+    <p class="meta" style="margin-top: 2em;">Wer Ja sagt, wartet vermutlich noch auf den Render.</p>
     <div class="footer-brand">
       <img src="assets/enignum.png" alt="">
       <span>Knut Göttling &middot; Enignum AI</span>
@@ -702,24 +702,19 @@
   <section class="slide">
     <h2>Vector Tiles aus Oracle</h2>
     <p>Eine Funktion. Eine Tabelle. Ein BLOB.</p>
-<pre><span class="kw">function</span> get_tile(p_zoom <span class="kw">number</span>, p_x <span class="kw">number</span>, p_y <span class="kw">number</span>) <span class="kw">return blob is</span>
-  l_tile <span class="kw">blob</span>;
-<span class="kw">begin</span>
-  l_tile := MDSYS.SDO_UTIL.GET_VECTORTILE(
-    table_name    => <span class="str">'CHA_CHARGING_STATION'</span>,
-    geom_col_name => <span class="str">'GEO'</span>,
-    tile_x        => p_x,
-    tile_y        => p_y,
-    tile_zoom     => p_zoom,
-    att_col_names => MDSYS.SDO_STRING_ARRAY(
-                       <span class="str">'CHA_CHARGING_STATION_ID'</span>,
-                       <span class="str">'STATION_TYPE'</span>,
-                       <span class="str">'OPERATOR_DISPLAYNAME'</span>),
-    layer_name    => <span class="str">'charging_stations'</span>,
-    google_ts     => <span class="kw">true</span>            <span class="comment">-- WICHTIG: XYZ-Schema</span>
-  );
-  <span class="kw">return</span> l_tile;
-<span class="kw">end</span>;</pre>
+<pre>MDSYS.SDO_UTIL.GET_VECTORTILE(
+  table_name    => <span class="str">'CHA_CHARGING_STATION'</span>,
+  geom_col_name => <span class="str">'GEO'</span>,
+  tile_x        => :x,
+  tile_y        => :y,
+  tile_zoom     => :z,
+  att_col_names => MDSYS.SDO_STRING_ARRAY(
+                     <span class="str">'CHA_CHARGING_STATION_ID'</span>,
+                     <span class="str">'STATION_TYPE'</span>,
+                     <span class="str">'OPERATOR_DISPLAYNAME'</span>),
+  layer_name    => <span class="str">'charging_stations'</span>,
+  google_ts     => <span class="kw">true</span>            <span class="comment">-- WICHTIG: XYZ-Schema</span>
+)</pre>
     <div class="footer-brand">
       <img src="assets/enignum.png" alt="">
       <span>Knut Göttling &middot; Enignum AI</span>
@@ -730,14 +725,9 @@
   <!-- 15 — ORDS-Endpoint Code                                      -->
   <!-- ============================================================ -->
   <section class="slide">
-    <h2>ORDS-Endpoint — in 30 Zeilen</h2>
-<pre>ords.define_module(
-  p_module_name => <span class="str">'cha'</span>,
-  p_base_path   => <span class="str">'cha/'</span>);
-
-ords.define_template(
-  p_module_name => <span class="str">'cha'</span>,
-  p_pattern     => <span class="str">'tiles/:z/:x/:y'</span>);
+    <h2>ORDS-Endpoint — alles an einer Stelle</h2>
+<pre>ords.define_module(p_module_name => <span class="str">'cha'</span>, p_base_path => <span class="str">'cha/'</span>);
+ords.define_template(p_module_name => <span class="str">'cha'</span>, p_pattern => <span class="str">'tiles/:z/:x/:y'</span>);
 
 ords.define_handler(
   p_module_name => <span class="str">'cha'</span>,
@@ -747,7 +737,16 @@ ords.define_handler(
   p_source      => q'[
     <span class="kw">declare</span> l_tile <span class="kw">blob</span>;
     <span class="kw">begin</span>
-      l_tile := PA_TILES.get_tile(:z, :x, :y);
+      l_tile := MDSYS.SDO_UTIL.GET_VECTORTILE(
+                  table_name    => <span class="str">'CHA_CHARGING_STATION'</span>,
+                  geom_col_name => <span class="str">'GEO'</span>,
+                  tile_x => :x, tile_y => :y, tile_zoom => :z,
+                  att_col_names => MDSYS.SDO_STRING_ARRAY(
+                                     <span class="str">'CHA_CHARGING_STATION_ID'</span>,
+                                     <span class="str">'STATION_TYPE'</span>,
+                                     <span class="str">'OPERATOR_DISPLAYNAME'</span>),
+                  layer_name => <span class="str">'charging_stations'</span>,
+                  google_ts  => <span class="kw">true</span>);
       owa_util.mime_header(<span class="str">'application/vnd.mapbox-vector-tile'</span>, <span class="kw">false</span>);
       htp.p(<span class="str">'Cache-Control: public, max-age=3600'</span>);
       owa_util.http_header_close;

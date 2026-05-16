@@ -44,10 +44,18 @@ begin
       declare
         l_tile blob;
       begin
-        l_tile := PA_TILES.get_tile(
-          p_zoom => to_number(:z),
-          p_x    => to_number(:x),
-          p_y    => to_number(:y));
+        l_tile := MDSYS.SDO_UTIL.GET_VECTORTILE(
+          table_name    => 'CHA_CHARGING_STATION',
+          geom_col_name => 'GEO',
+          tile_x        => to_number(:x),
+          tile_y        => to_number(:y),
+          tile_zoom     => to_number(:z),
+          att_col_names => MDSYS.SDO_STRING_ARRAY(
+                             'CHA_CHARGING_STATION_ID',
+                             'STATION_TYPE',
+                             'OPERATOR_DISPLAYNAME'),
+          layer_name    => 'charging_stations',
+          google_ts     => true);
         owa_util.mime_header('application/vnd.mapbox-vector-tile', false);
         htp.p('Cache-Control: public, max-age=3600');
         htp.p('Access-Control-Allow-Origin: *');

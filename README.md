@@ -10,6 +10,7 @@ Begleitcode zum gleichnamigen Vortrag: Import des öffentlichen Ladesäulenregis
 - **JSON-Spalten** und `JSON_TABLE` zur Aufbereitung der REST-Antwort.
 - **`APEX_WEB_SERVICE.make_rest_request`** direkt im `MERGE` über `JSON_TABLE` konsumiert — ohne Staging-Tabelle.
 - **Autonomes Logging-Paket** (`pragma autonomous_transaction`).
+- **`MDSYS.SDO_UTIL.GET_VECTORTILE`** + **ORDS** für Vector-Tile-Ausgabe an MapLibre-Frontend — skaliert für 100.000+ Geo-Objekte ohne MB-JSON-Payload.
 
 ## Inhalt
 
@@ -22,7 +23,13 @@ Datenbank/
     ├── Table LOG_TAB.sql                  -- Logging-Tabelle inkl. Domain
     ├── Table CHA_CHARGING_STATION.sql     -- Faktentabelle inkl. Domains, Spatial-Index, Trigger
     ├── PA_LOG.pck                         -- Logging-API (autonome Transaktionen)
-    └── PA_BNETZA.pck                      -- REST-Loader (BNetzA → Oracle)
+    ├── PA_BNETZA.pck                      -- REST-Loader (BNetzA → Oracle)
+    ├── V_CHA_STATION_DETAIL.sql           -- View mit aufbereiteten Detaildaten (für Vector-Tiles-Demo)
+    └── ords_setup.sql                     -- ORDS-Modul "cha": Tile- und Detail-Endpoint
+
+apex/
+├── f101 Ladesäulen mit Map Region.zip     -- APEX-Anwendungsexport (App Map Region)
+└── f102 Ladesäulen mit Vector Tiles.zip   -- APEX-Anwendungsexport (App Vector Tiles)
 ```
 
 ## Installation
@@ -38,6 +45,14 @@ Reihenfolge ist wichtig — die späteren Skripte hängen von Domains und Tabell
    - `Datenbank/CHASTA/Table CHA_CHARGING_STATION.sql`
    - `Datenbank/CHASTA/PA_LOG.pck`
    - `Datenbank/CHASTA/PA_BNETZA.pck`
+
+3. **Für die Vector-Tiles-Demo zusätzlich (als `CHASTA`):**
+   - `Datenbank/CHASTA/V_CHA_STATION_DETAIL.sql`
+   - `Datenbank/CHASTA/ords_setup.sql` — setzt voraus, dass ORDS für `CHASTA` aktiviert ist (`ords.enable_schema(...)`). Den entsprechenden Block oben in `ords_setup.sql` ggf. einmal als SYS/SYSTEM ausführen.
+
+4. **APEX-Anwendungen importieren** (App Builder → Import):
+   - `apex/f101 Ladesäulen mit Map Region.zip`
+   - `apex/f102 Ladesäulen mit Vector Tiles.zip`
 
 Die Datenbank benötigt zusätzlich eine **Network ACL** für den BNetzA-Endpoint  
 `https://ladesaeulenregister.bnetza.de/els/service/public/v1/chargepoints`,  
