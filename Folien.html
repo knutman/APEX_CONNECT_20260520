@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vom Ladesäulenregister zur performanten Karte — APEX Connect 2026</title>
+<style>
+  :root {
+    --fg:        #1f2937;
+    --fg-muted:  #6b7280;
+    --bg:        #ffffff;
+    --bg-soft:   #f9fafb;
+    --accent:    #2563eb;
+    --accent-2:  #dc2626;
+    --border:    #e5e7eb;
+    --code-bg:   #0f172a;
+    --code-fg:   #e2e8f0;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font: 22px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--fg); background: var(--bg);
+    overflow: hidden;
+  }
+
+  .slides { position: relative; height: 100vh; width: 100vw; }
+  .slide {
+    position: absolute; inset: 0;
+    padding: 5vh 7vw;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    overflow: auto;
+  }
+  .slide.active { display: flex; }
+
+  h1 { font-size: 3.2em; margin: 0 0 0.4em; color: var(--fg); line-height: 1.1; }
+  h2 { font-size: 2.0em; margin: 0 0 0.6em; color: var(--accent); line-height: 1.15; }
+  h3 { font-size: 1.3em; margin: 0 0 0.4em; color: var(--fg-muted); font-weight: 500; }
+  p  { margin: 0 0 0.7em; }
+
+  ul, ol { margin: 0 0 0.7em; padding-left: 1.4em; }
+  li { margin: 0.3em 0; }
+
+  .lead { font-size: 1.3em; color: var(--fg-muted); max-width: 28em; }
+  .big  { font-size: 1.8em; line-height: 1.3; }
+  .huge { font-size: 3em; line-height: 1.1; font-weight: 600; }
+
+  .center { text-align: center; align-items: center; }
+  .center h1, .center h2, .center p, .center ul { text-align: center; }
+  .center ul { display: inline-block; text-align: left; }
+
+  .meta { color: var(--fg-muted); font-size: 0.9em; }
+
+  code, pre {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-fg);
+    padding: 0.9em 1.2em; border-radius: 8px;
+    font-size: 0.78em; line-height: 1.45;
+    overflow-x: auto;
+    max-height: 60vh;
+  }
+  code.inline {
+    background: var(--bg-soft); padding: 0.1em 0.35em;
+    border-radius: 4px; font-size: 0.9em;
+    border: 1px solid var(--border);
+  }
+  .kw     { color: #93c5fd; }
+  .str    { color: #fcd34d; }
+  .comment{ color: #94a3b8; font-style: italic; }
+
+  table { border-collapse: collapse; margin: 0.4em 0; font-size: 0.95em; }
+  th, td { padding: 0.5em 1em; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { background: var(--bg-soft); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2em; }
+  .grid-2 > div { min-width: 0; }
+
+  .badge {
+    display: inline-block;
+    padding: 0.15em 0.6em; border-radius: 999px;
+    font-size: 0.75em; font-weight: 600;
+    background: var(--accent); color: white;
+    vertical-align: middle;
+  }
+  .badge--red { background: var(--accent-2); }
+
+  .quote {
+    font-size: 1.5em; font-style: italic;
+    border-left: 4px solid var(--accent);
+    padding: 0.3em 0 0.3em 1em;
+    color: var(--fg-muted);
+    max-width: 24em;
+  }
+
+  /* Navigation */
+  nav.controls {
+    position: fixed; right: 24px; bottom: 24px;
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(6px);
+    padding: 8px 12px; border-radius: 999px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    border: 1px solid var(--border);
+    user-select: none;
+    z-index: 100;
+  }
+  nav.controls button {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    background: white; color: var(--fg);
+    border-radius: 50%; cursor: pointer;
+    font-size: 18px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  nav.controls button:hover:not(:disabled) {
+    background: var(--accent); color: white; border-color: var(--accent);
+  }
+  nav.controls button:disabled { opacity: 0.3; cursor: default; }
+  nav.controls .counter {
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-muted); font-size: 0.85em;
+    min-width: 4em; text-align: center;
+  }
+
+  /* Progress bar */
+  .progress {
+    position: fixed; top: 0; left: 0;
+    height: 3px; background: var(--accent);
+    width: 0; transition: width 0.3s ease;
+    z-index: 100;
+  }
+
+  /* Blackout */
+  body.blackout .slides { visibility: hidden; }
+  body.blackout { background: #000; }
+  body.blackout nav.controls, body.blackout .progress { display: none; }
+
+  /* Print: each slide on its own page (optional) */
+  @media print {
+    .slide { display: flex !important; page-break-after: always; height: 100vh; }
+    nav.controls, .progress { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<div class="slides">
+
+  <!-- ============================================================ -->
+  <!-- 1 — Titel                                                    -->
+  <!-- ============================================================ -->
+  <section class="slide center">
+    <h1>Vom Ladesäulenregister<br>zur performanten Karte</h1>
+    <p class="lead">Was Oracle 26ai für Geo-Daten in APEX liefert</p>
+    <p class="meta">Knut Göttling &middot; APEX Connect 2026 &middot; 20. Mai 2026</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 2 — Hook                                                     -->
+  <!-- ============================================================ -->
+  <section class="slide center">
+    <div class="quote">
+      „Wer hat schon mal versucht, mehr als 50.000 Punkte<br>
+      auf eine APEX-Map zu bekommen?"
+    </div>
+    <p class="meta" style="margin-top: 2em;">— jeder, der eine Map-Region mal geöffnet hat</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 3 — Datensatz                                                -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Der Datensatz</h2>
+    <h3>Öffentliches Ladesäulenregister der Bundesnetzagentur</h3>
+    <ul class="big">
+      <li>~110.000 Ladestationen, deutschlandweit</li>
+      <li>Frei verfügbar als REST-Endpoint, JSON</li>
+      <li>Adressen, Geokoordinaten, Betreiber, Steckertypen, Leistung</li>
+      <li>Täglich aktualisiert</li>
+    </ul>
+    <p class="meta" style="margin-top: 1em;">
+      <code class="inline">https://ladesaeulenregister.bnetza.de/els/service/public/v1/chargepoints</code>
+    </p>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 4 — Datenmodell                                              -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Datenmodell — selbstbeschreibend</h2>
+    <p>SQL Domains und Annotations machen die Tabelle zur Doku.</p>
+<pre><span class="kw">create domain</span> created_time_d <span class="kw">as date</span>
+  <span class="kw">default</span> sysdate <span class="kw">not null</span>
+  annotations (
+    system_generated,
+    description <span class="str">'Creation date of this entry.'</span>,
+    visibility  <span class="str">'ui_hidden'</span>
+  );
+
+<span class="kw">create table</span> CHA_CHARGING_STATION (
+  station_type domain CHA_TYPE_OF_CHARGING_STATION_ENUM
+               annotations (Description <span class="str">'Art der Ladesäule'</span>),
+  geo          sdo_geometry not null
+               annotations (Description <span class="str">'Standort der Ladestation'</span>),
+  payment_systems json
+               annotations (Description <span class="str">'Bezahlsysteme'</span>),
+  created_dt   domain created_time_d,
+  ...
+);</pre>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 5 — Spatial + JSON                                           -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Spatial &amp; JSON — Bürger erster Klasse</h2>
+    <div class="grid-2" style="margin-top: 1em;">
+      <div>
+        <h3>SDO_GEOMETRY</h3>
+        <ul>
+          <li>Native Geo-Spalte mit SRID 4326</li>
+          <li>Spatial-Index <code class="inline">spatial_index_v2</code></li>
+          <li>SDO_FILTER, SDO_WITHIN_DISTANCE &amp; Co.</li>
+          <li>Voraussetzung für Vector Tiles</li>
+        </ul>
+      </div>
+      <div>
+        <h3>JSON</h3>
+        <ul>
+          <li><code class="inline">json</code>-Spalte direkt im DDL</li>
+          <li><code class="inline">JSON_TABLE</code> entfaltet Arrays in SELECTs</li>
+          <li>Nested Paths für mehrstufige Strukturen</li>
+          <li>Kein PL/SQL-Parsing nötig</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 6 — Loader                                                   -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Loader: REST direkt im MERGE</h2>
+    <p>Keine Staging-Tabelle, keine Zwischenstufe.</p>
+<pre><span class="kw">merge into</span> cha_charging_station dst
+  <span class="kw">using</span> ( <span class="kw">select</span> res.*
+            <span class="kw">from</span> json_table(
+                   APEX_WEB_SERVICE.make_rest_request(
+                     p_url => lcUri, p_http_method => <span class="str">'GET'</span>),
+                   <span class="str">'$.chargingStations[*]'</span>
+                   <span class="kw">columns</span> (
+                     ext_id   <span class="kw">number</span>   <span class="kw">path</span> <span class="str">'$.id'</span>,
+                     city     <span class="kw">varchar2</span> <span class="kw">path</span> <span class="str">'$.city'</span>,
+                     evses    clob format json <span class="kw">path</span> <span class="str">'$.evses'</span>,
+                     ...
+                   )
+                 ) res
+        ) src
+  <span class="kw">on</span>            (dst.ext_id = src.ext_id)
+  <span class="kw">when matched then update set</span> ...
+  <span class="kw">when not matched then insert</span>  ...;</pre>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 7 — Demo App 1                                               -->
+  <!-- ============================================================ -->
+  <section class="slide center">
+    <h2>Demo: Map Region<br><span style="color: var(--accent);">— der klassische Weg</span></h2>
+    <p class="big" style="margin-top: 1em;">App 1 — alle Pins direkt in der Region</p>
+    <p class="meta">→ Browser-Tab wechseln</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 8 — Das Problem                                              -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Das Problem</h2>
+    <div class="grid-2" style="margin-top: 1em;">
+      <div>
+        <h3>Was passiert?</h3>
+        <ul>
+          <li>APEX lädt die <strong>komplette</strong> Query</li>
+          <li>Jeder Pin landet im DOM</li>
+          <li>Initial-Payload: mehrere MB JSON</li>
+          <li>Render-Stutter bei jedem Pan/Zoom</li>
+          <li>Mobil / schwache Hardware: unbenutzbar</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Hilft das?</h3>
+        <ul>
+          <li>Clustering im Frontend → linderts</li>
+          <li>Initial-Zoom kleiner setzen → lädt trotzdem alles</li>
+          <li>Filter via Item → ändert aber die Story</li>
+        </ul>
+        <p class="meta" style="margin-top: 1em;">
+          Brauchen wir eine <strong>andere Architektur</strong>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 9 — Vector Tiles erklärt                                     -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Vector Tiles</h2>
+    <ul class="big">
+      <li>Karte ist in <strong>Kacheln</strong> aufgeteilt: Z (Zoom), X, Y</li>
+      <li>Pro Kachel ein <strong>kompaktes Binärformat</strong> (MVT, Mapbox Vector Tile)</li>
+      <li>Browser lädt nur die <strong>sichtbaren</strong> Kacheln</li>
+      <li>Cache-fähig wie ein Bild — zweite Anfrage = 0 ms</li>
+      <li>Symbol &amp; Farbe werden im <strong>Frontend</strong> festgelegt</li>
+    </ul>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 10 — SDO_UTIL.GET_VECTORTILE                                 -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Vector Tiles aus Oracle</h2>
+    <p>Eine Funktion. Eine Tabelle. Ein BLOB.</p>
+<pre><span class="kw">function</span> get_tile(p_zoom <span class="kw">number</span>, p_x <span class="kw">number</span>, p_y <span class="kw">number</span>) <span class="kw">return blob is</span>
+  l_tile <span class="kw">blob</span>;
+<span class="kw">begin</span>
+  l_tile := MDSYS.SDO_UTIL.GET_VECTORTILE(
+    table_name    => <span class="str">'CHA_CHARGING_STATION'</span>,
+    geom_col_name => <span class="str">'GEO'</span>,
+    tile_x        => p_x,
+    tile_y        => p_y,
+    tile_zoom     => p_zoom,
+    att_col_names => MDSYS.SDO_STRING_ARRAY(
+                       <span class="str">'CHA_CHARGING_STATION_ID'</span>,
+                       <span class="str">'STATION_TYPE'</span>,
+                       <span class="str">'OPERATOR_DISPLAYNAME'</span>),
+    layer_name    => <span class="str">'charging_stations'</span>,
+    google_ts     => <span class="kw">true</span>          <span class="comment">-- WICHTIG: XYZ-Schema</span>
+  );
+  <span class="kw">return</span> l_tile;
+<span class="kw">end</span>;</pre>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 11 — ORDS-Endpoint                                           -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>ORDS — REST-Endpoint in 30 Zeilen</h2>
+<pre>ords.define_module(
+  p_module_name => <span class="str">'cha'</span>,
+  p_base_path   => <span class="str">'cha/'</span>);
+
+ords.define_template(
+  p_module_name => <span class="str">'cha'</span>,
+  p_pattern     => <span class="str">'tiles/:z/:x/:y'</span>);
+
+ords.define_handler(
+  p_module_name => <span class="str">'cha'</span>,
+  p_pattern     => <span class="str">'tiles/:z/:x/:y'</span>,
+  p_method      => <span class="str">'GET'</span>,
+  p_source_type => ords.source_type_plsql,
+  p_source      => q'[
+    <span class="kw">declare</span> l_tile <span class="kw">blob</span>;
+    <span class="kw">begin</span>
+      l_tile := PA_TILES.get_tile(:z, :x, :y);
+      owa_util.mime_header(<span class="str">'application/vnd.mapbox-vector-tile'</span>, <span class="kw">false</span>);
+      htp.p(<span class="str">'Cache-Control: public, max-age=3600'</span>);
+      owa_util.http_header_close;
+      wpg_docload.download_file(l_tile);
+    <span class="kw">end</span>;
+  ]');</pre>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 12 — Demo App 2                                              -->
+  <!-- ============================================================ -->
+  <section class="slide center">
+    <h2>Demo: Vector Tiles<br><span style="color: var(--accent-2);">— die schnelle Variante</span></h2>
+    <p class="big" style="margin-top: 1em;">App 2 — MapLibre direkt am ORDS-Endpoint</p>
+    <p class="meta">→ Browser-Tab wechseln, DevTools mit Network-Tab</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 13 — Vergleich                                               -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Vergleich</h2>
+    <table>
+      <thead>
+        <tr><th>Aspekt</th>
+            <th><span class="badge">App 1</span> Pins</th>
+            <th><span class="badge badge--red">App 2</span> Vector Tiles</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Initialer Payload</td>          <td>mehrere MB JSON</td>     <td>~KB pro Tile</td></tr>
+        <tr><td>Renderzeit</td>                  <td>sekundenlanger Stutter</td><td>sofort</td></tr>
+        <tr><td>Pan / Zoom</td>                  <td>alle Pins neu</td>       <td>nur fehlende Tiles</td></tr>
+        <tr><td>HTTP-Cache</td>                  <td>nein</td>                <td>ja</td></tr>
+        <tr><td>Aufwand DB</td>                  <td>Tabelle + Map-Query</td> <td>+ PA_TILES + ORDS</td></tr>
+        <tr><td>Aufwand Frontend</td>            <td>APEX-Standard</td>       <td>MapLibre-Glue</td></tr>
+        <tr><td>Lohnt sich ab</td>               <td colspan="2" style="text-align: center;">~5.000 Features</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 14 — Take-aways                                              -->
+  <!-- ============================================================ -->
+  <section class="slide">
+    <h2>Take-aways</h2>
+    <ol class="big">
+      <li>Moderne Oracle-Features machen das Datenmodell <strong>selbstbeschreibend</strong>.</li>
+      <li>Spatial + JSON sind <strong>Bürger erster Klasse</strong> — kein Add-on mehr.</li>
+      <li>Vector Tiles aus der DB lösen das <strong>Skalierungsproblem</strong> klassischer Pin-Karten.</li>
+    </ol>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 15 — Danke / Q&A                                             -->
+  <!-- ============================================================ -->
+  <section class="slide center">
+    <h1 class="huge">Danke!</h1>
+    <p class="lead">Fragen? Ideen? Erfahrungen?</p>
+    <p class="meta" style="margin-top: 2em;">
+      Quellcode &amp; Demo:<br>
+      <code class="inline" style="font-size: 1.1em;">github.com/knutman/APEX_CONNECT_20260520</code>
+    </p>
+  </section>
+
+</div>
+
+<nav class="controls" aria-label="Folien-Navigation">
+  <button id="prev" title="Zurück (←)">‹</button>
+  <span class="counter" id="counter">1 / 1</span>
+  <button id="next" title="Vor (→)">›</button>
+</nav>
+
+<script>
+(function () {
+  const slides    = Array.from(document.querySelectorAll('.slide'));
+  const total     = slides.length;
+  const prevBtn   = document.getElementById('prev');
+  const nextBtn   = document.getElementById('next');
+  const counterEl = document.getElementById('counter');
+  const progress  = document.getElementById('progress');
+
+  let idx = 0;
+
+  function show(n) {
+    idx = Math.max(0, Math.min(n, total - 1));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    counterEl.textContent = `${idx + 1} / ${total}`;
+    prevBtn.disabled = (idx === 0);
+    nextBtn.disabled = (idx === total - 1);
+    progress.style.width = `${((idx + 1) / total) * 100}%`;
+    if (history.replaceState) {
+      history.replaceState(null, '', `#${idx + 1}`);
+    } else {
+      location.hash = `#${idx + 1}`;
+    }
+  }
+
+  function fromHash() {
+    const n = parseInt(location.hash.replace('#', ''), 10);
+    if (!isNaN(n) && n >= 1 && n <= total) show(n - 1);
+    else show(0);
+  }
+
+  prevBtn.addEventListener('click', () => show(idx - 1));
+  nextBtn.addEventListener('click', () => show(idx + 1));
+  window.addEventListener('hashchange', fromHash);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        show(idx + 1); e.preventDefault(); break;
+      case 'ArrowLeft':
+      case 'PageUp':
+        show(idx - 1); e.preventDefault(); break;
+      case 'Home':
+        show(0); e.preventDefault(); break;
+      case 'End':
+        show(total - 1); e.preventDefault(); break;
+      case 'f':
+      case 'F':
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen();
+        break;
+      case 'b':
+      case 'B':
+      case '.':
+        document.body.classList.toggle('blackout');
+        break;
+    }
+  });
+
+  fromHash();
+})();
+</script>
+
+</body>
+</html>
