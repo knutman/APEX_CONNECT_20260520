@@ -1,0 +1,163 @@
+<!--
+  Static-Content-Region in der zweiten APEX-App.
+  Annahme: APEX und ORDS laufen auf demselben Host (relative URLs).
+  Sonst die Konstanten TILE_BASE / DETAIL_BASE oben im <script> auf
+  die volle URL umstellen.
+-->
+
+<div id="cha-map" style="height: 75vh; width: 100%;"></div>
+
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+<style>
+  /* MapLibre-Popup-Container vergroessern + scrollbar machen */
+  .maplibregl-popup-content {
+    max-width: 460px !important;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 14px 18px !important;
+    border-radius: 8px;
+  }
+  .maplibregl-popup-close-button { font-size: 18px; padding: 2px 8px; }
+
+  .cha-popup { font: 13px/1.45 system-ui, sans-serif; color: #1f2937; }
+  .cha-popup__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .cha-popup__name { margin: 0; font-size: 15px; line-height: 1.25; }
+  .cha-popup__subname { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  .cha-popup__subname:empty { display: none; }
+  .cha-popup__badge { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .cha-popup__badge--ok      { background: #d1fae5; color: #065f46; }
+  .cha-popup__badge--warn    { background: #fef3c7; color: #92400e; }
+  .cha-popup__badge--unknown { background: #e5e7eb; color: #374151; }
+  .cha-popup__addr { font-style: normal; margin: 0 0 6px; color: #374151; }
+  .cha-popup__addr-add:empty { display: none; }
+  .cha-popup__addr-add:not(:empty)::after { content: "\A"; white-space: pre; }
+  .cha-popup__region:empty { display: none; }
+  .cha-popup__loc { margin: 0 0 10px; font-style: italic; color: #6b7280; }
+  .cha-popup__loc:empty { display: none; }
+  .cha-popup__grid { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0; }
+  .cha-popup__grid dt { color: #6b7280; font-weight: 500; }
+  .cha-popup__grid dd { margin: 0; }
+  .cha-popup__foot { margin-top: 10px; font-size: 11px; color: #9ca3af; text-align: right; border-top: 1px solid #f3f4f6; padding-top: 6px; }
+</style>
+
+<script>
+(function () {
+  const TILE_BASE   = `${window.location.origin}/ords/chasta/cha/tiles`;
+  const DETAIL_BASE = `${window.location.origin}/ords/chasta/cha/stations`;
+
+  const map = new maplibregl.Map({
+    container: 'cha-map',
+    style: {
+      version: 8,
+      sources: {
+        positron: {
+          type: 'raster',
+          tiles: [
+            'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+            'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+            'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+            'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+          ],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors © CARTO'
+        },
+        chasta: {
+          type: 'vector',
+          tiles: [`${TILE_BASE}/{z}/{x}/{y}`],
+          minzoom: 0,
+          maxzoom: 14
+        }
+      },
+      layers: [
+        { id: 'positron', type: 'raster', source: 'positron' },
+        {
+          id: 'chasta-points',
+          type: 'circle',
+          source: 'chasta',
+          'source-layer': 'charging_stations',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 14, 8],
+            'circle-color': [
+              'match',
+              ['get', 'STATION_TYPE'],
+              'Schnellladeeinrichtung', '#dc2626',
+              'Normalladeeinrichtung',  '#2563eb',
+              '#888888'
+            ],
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 1
+          }
+        }
+      ]
+    },
+    center: [10.45, 51.16],
+    zoom: 5.5
+  });
+
+  map.addControl(new maplibregl.NavigationControl());
+  map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }));
+
+  map.on('mouseenter', 'chasta-points', () => map.getCanvas().style.cursor = 'pointer');
+  map.on('mouseleave', 'chasta-points', () => map.getCanvas().style.cursor = '');
+
+  map.on('click', 'chasta-points', async (e) => {
+    const feat = e.features[0];
+    const id   = feat.properties.CHA_CHARGING_STATION_ID;
+    if (!id) return;
+
+    try {
+      const resp = await fetch(`${DETAIL_BASE}/${id}`);
+      const json = await resp.json();
+      const data = (json.items && json.items[0]) || json;
+
+      new maplibregl.Popup({ maxWidth: '460px' })
+        .setLngLat(e.lngLat)
+        .setHTML(renderPopup(data))
+        .addTo(map);
+    } catch (err) {
+      console.error('Detail-Abruf fehlgeschlagen:', err);
+    }
+  });
+
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/[&<>"']/g,
+      c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  function renderPopup(d) {
+    return `
+      <div class="cha-popup">
+        <header class="cha-popup__head">
+          <div>
+            <h3 class="cha-popup__name">${esc(d.operator_name)}</h3>
+            <div class="cha-popup__subname">${esc(d.operator_secondary)}</div>
+          </div>
+          <span class="cha-popup__badge ${esc(d.status_class)}">${esc(d.status_operational)}</span>
+        </header>
+        <address class="cha-popup__addr">
+          ${esc(d.street_line)}<br>
+          <span class="cha-popup__addr-add">${esc(d.address_addition)}</span>
+          ${esc(d.city_line)}<br>
+          <span class="cha-popup__region">${esc(d.region_line)}</span>
+        </address>
+        <p class="cha-popup__loc">${esc(d.location_description)}</p>
+        <dl class="cha-popup__grid">
+          <dt>BNetzA-ID</dt>      <dd>${esc(d.cha_charging_station_ext_id)}</dd>
+          <dt>Art</dt>            <dd>${esc(d.station_type)}</dd>
+          <dt>Nennleistung</dt>   <dd>${esc(d.power_fmt)}</dd>
+          <dt>Inbetriebnahme</dt> <dd>${esc(d.go_live_date_fmt)}</dd>
+          <dt>Öffnungszeiten</dt> <dd>${esc(d.opening_hours_specification)}</dd>
+          <dt>Zugang</dt>         <dd>${esc(d.access_restriction)}</dd>
+          <dt>Bezahlung</dt>      <dd>${esc(d.payment_systems_fmt)}</dd>
+          <dt>Ladepunkte</dt>     <dd>${esc(d.evse_fmt)}</dd>
+          <dt>Koordinaten</dt>    <dd>${esc(d.latitude)}, ${esc(d.longitude)}</dd>
+        </dl>
+        <footer class="cha-popup__foot">Stand: ${esc(d.stand_fmt)}</footer>
+      </div>
+    `;
+  }
+})();
+</script>
